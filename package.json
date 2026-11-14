@@ -1,0 +1,27 @@
+{
+  "name": "attendance-reminder-bot",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp pengingat absensi otomatis berbasis Baileys dan node-cron",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test-send": "node index.js --test"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "reminder",
+    "attendance",
+    "cron"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

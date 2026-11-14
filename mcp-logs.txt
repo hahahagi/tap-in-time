@@ -1,0 +1,12 @@
+{"level":30,"time":"2026-11-14T03:34:43.616Z","pid":16320,"hostname":"Asus","msg":"Starting WhatsApp MCP Server..."}
+{"level":30,"time":"2026-11-14T03:34:43.616Z","pid":16320,"hostname":"Asus","msg":"Initializing database..."}
+{"level":30,"time":"2026-11-14T03:34:43.641Z","pid":16320,"hostname":"Asus","msg":"Database initialized successfully."}
+{"level":30,"time":"2026-11-14T03:34:43.641Z","pid":16320,"hostname":"Asus","msg":"Attempting to connect to WhatsApp..."}
+{"level":30,"time":"2026-11-14T03:34:44.348Z","pid":16320,"hostname":"Asus","msg":"WhatsApp connection process initiated."}
+{"level":30,"time":"2026-11-14T03:34:44.348Z","pid":16320,"hostname":"Asus","msg":"Starting MCP server..."}
+{"level":30,"time":"2026-11-14T03:34:44.349Z","pid":16320,"hostname":"Asus","msg":"Initializing MCP server..."}
+{"level":30,"time":"2026-11-14T03:34:44.356Z","pid":16320,"hostname":"Asus","msg":"MCP server configured. Connecting stdio transport..."}
+{"level":30,"time":"2026-11-14T03:34:44.356Z","pid":16320,"hostname":"Asus","msg":"MCP transport connected. Server is ready and listening via stdio."}
+{"level":30,"time":"2026-11-14T03:34:44.356Z","pid":16320,"hostname":"Asus","msg":"MCP Server setup complete. Waiting for requests from client..."}
+{"level":30,"time":"2026-11-14T03:34:44.356Z","pid":16320,"hostname":"Asus","msg":"MCP Server started and listening."}
+{"level":30,"time":"2026-11-14T03:34:44.356Z","pid":16320,"hostname":"Asus","msg":"Application setup complete. Running..."}
