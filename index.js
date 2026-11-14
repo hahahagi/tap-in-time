@@ -20,9 +20,9 @@ const pino = require('pino');
 // 1. TEMPLATE PESAN PENGINGAT
 // ============================================================================
 const MESSAGE_TEMPLATES = {
-  tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nSelamat pagi rekan-rekan! 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
-  tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nSelamat sore rekan-rekan! 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
-  test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo! Ini adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
+  tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nHalo @all! 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
+  tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nHalo @all! 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
+  test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo @all! Ini adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
 };
 
 // ============================================================================
@@ -110,8 +110,25 @@ async function sendReminder(type) {
 
   try {
     logger.info(`Mengirim reminder '${type}' ke ${targetJid}...`);
-    await currentSock.sendMessage(targetJid, { text: messageText });
-    logger.info(`[BERHASIL] Pesan pengingat '${type}' telah terkirim ke target.`);
+
+    // Ambil daftar seluruh anggota jika target adalah grup WhatsApp (@g.us)
+    let mentions = [];
+    if (targetJid.endsWith('@g.us')) {
+      try {
+        const groupMeta = await currentSock.groupMetadata(targetJid);
+        mentions = groupMeta.participants.map((p) => p.id);
+      } catch (err) {
+        logger.warn('Gagal mengambil metadata grup untuk mention: ' + err.message);
+      }
+    }
+
+    // Kirim pesan dengan menyertakan array mentions (semua member grup ditag)
+    await currentSock.sendMessage(targetJid, {
+      text: messageText,
+      mentions: mentions
+    });
+
+    logger.info(`[BERHASIL] Pesan pengingat '${type}' telah terkirim beserta tag all (${mentions.length} anggota).`);
   } catch (err) {
     logger.error({ err }, `[GAGAL] Gagal mengirim pengingat '${type}'`);
   }
