@@ -20,9 +20,9 @@ const pino = require('pino');
 // 1. TEMPLATE PESAN PENGINGAT
 // ============================================================================
 const MESSAGE_TEMPLATES = {
-  tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nHalo @all! 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
-  tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nHalo @all! 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
-  test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo @all! Ini adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
+  tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nHalo @all 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
+  tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nHalo @all 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
+  test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo @all 👋\nIni adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
 };
 
 // ============================================================================
@@ -111,24 +111,37 @@ async function sendReminder(type) {
   try {
     logger.info(`Mengirim reminder '${type}' ke ${targetJid}...`);
 
-    // Ambil daftar seluruh anggota jika target adalah grup WhatsApp (@g.us)
+    let finalMessage = messageText;
     let mentions = [];
+
+    // Ambil daftar seluruh anggota jika target adalah grup WhatsApp (@g.us)
     if (targetJid.endsWith('@g.us')) {
       try {
         const groupMeta = await currentSock.groupMetadata(targetJid);
         mentions = groupMeta.participants.map((p) => p.id);
+
+        // Buat deretan tag nomor anggota
+        const mentionTags = mentions
+          .map((id) => `@${id.split('@')[0].split(':')[0]}`)
+          .join(' ');
+
+        // Sisipkan karakter pemisah WhatsApp (Baca selengkapnya) agar pesan utama tetap rapi
+        const readMore = String.fromCharCode(8206).repeat(4001);
+
+        // Gabungkan: Pesan utama bersih di atas, tag resmi tersembunyi di bawah
+        finalMessage = `${messageText}\n${readMore}\n\n*Tag All:*\n${mentionTags}`;
       } catch (err) {
         logger.warn('Gagal mengambil metadata grup untuk mention: ' + err.message);
       }
     }
 
-    // Kirim pesan dengan menyertakan array mentions (semua member grup ditag)
-    await currentSock.sendMessage(targetJid, {
-      text: messageText,
+    // Kirim pesan dengan menyertakan array mentions (semua member grup ternotifikasi)
+    const sentMsg = await currentSock.sendMessage(targetJid, {
+      text: finalMessage,
       mentions: mentions
     });
 
-    logger.info(`[BERHASIL] Pesan pengingat '${type}' telah terkirim beserta tag all (${mentions.length} anggota).`);
+    logger.info({ messageId: sentMsg?.key?.id, totalMentions: mentions.length }, `[BERHASIL] Pesan pengingat '${type}' telah terkirim.`);
   } catch (err) {
     logger.error({ err }, `[GAGAL] Gagal mengirim pengingat '${type}'`);
   }
@@ -282,8 +295,11 @@ async function startBot() {
         logger.info('🚀 [MODE TESTING AKTIF] Mengirim pesan pengujian segera...');
         setTimeout(async () => {
           await sendReminder('test');
-          logger.info('✅ Pesan uji coba selesai dikirim. Menghentikan mode test...');
-          process.exit(0);
+          logger.info('Menunggu 5 detik untuk memastikan paket data tersinkronisasi ke server WhatsApp...');
+          setTimeout(() => {
+            logger.info('✅ Pesan uji coba selesai dikirim. Menghentikan mode test.');
+            process.exit(0);
+          }, 5000);
         }, 3000);
         return;
       }
