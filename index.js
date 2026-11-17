@@ -1,10 +1,13 @@
 /**
- * Attendance Reminder Bot
- * Bot WhatsApp otomatis pengingat absensi berbasis Baileys dan node-cron.
- * Ringan, hemat RAM, tanpa browser/Puppeteer.
+ * Attendance Reminder Bot with Web Dashboard
+ * Bot WhatsApp otomatis pengingat absensi berbasis Baileys, node-cron, dan Express.
+ * Ringan, hemat RAM, tanpa browser/Puppeteer, siap dijalankan di Termux Android.
  */
 
 require('dotenv').config();
+const fs = require('node:fs');
+const path = require('node:path');
+const express = require('express');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -16,57 +19,86 @@ const cron = require('node-cron');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 
-// ============================================================================
-// 1. TEMPLATE PESAN PENGINGAT
-// ============================================================================
-const MESSAGE_TEMPLATES = {
-  tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nHalo @all 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
-  tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nHalo @all 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
-  test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo @all 👋\nIni adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
-};
-
-// ============================================================================
-// 2. DAFTAR TANGGAL LIBUR NASIONAL / CUTI BERSAMA (Format: YYYY-MM-DD)
-// Tambahkan tanggal merah di sini agar bot tidak mengirim reminder di hari libur.
-// ============================================================================
-const HOLIDAY_DATES = [
-  // Contoh daftar hari libur (silakan disesuaikan setiap tahun/kebutuhan):
-  '2026-01-01', // Tahun Baru Masehi
-  '2026-01-28', // Isra Miraj
-  '2026-01-29', // Tahun Baru Imlek
-  '2026-03-21', // Hari Suci Nyepi
-  '2026-03-31', // Hari Raya Idul Fitri
-  '2026-04-01', // Hari Raya Idul Fitri
-  '2026-04-03', // Wafat Isa Al Masih
-  '2026-05-01', // Hari Buruh Internasional
-  '2026-05-14', // Kenaikan Isa Al Masih
-  '2026-05-31', // Hari Raya Waisak
-  '2026-06-01', // Hari Lahir Pancasila
-  '2026-06-16', // Hari Raya Idul Adha
-  '2026-07-07', // Tahun Baru Islam
-  '2026-08-17', // Hari Kemerdekaan RI
-  '2026-09-15', // Maulid Nabi Muhammad SAW
-  '2026-12-25', // Hari Raya Natal
-];
-
 // Inisialisasi Logger
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
   timestamp: pino.stdTimeFunctions.isoTime
 });
 
+// ============================================================================
+// 1. MANAJEMEN KONFIGURASI DINAMIS (config.json)
+// ============================================================================
+const CONFIG_PATH = path.join(__dirname, 'config.json');
+
+const DEFAULT_CONFIG = {
+  targetGroupId: process.env.TARGET_GROUP_ID || '',
+  schedules: {
+    regularTapIn: '08:00',
+    regularTapOut: '17:30',
+    wednesdayTapIn: '06:00',
+    wednesdayTapOut: '16:00'
+  },
+  templates: {
+    tapIn: `⏰ *PENGINGAT TAP IN ABSENSI* ⏰\n\nHalo @all 👋\nWaktu absensi telah dibuka. Jangan lupa untuk segera melakukan *Tap In Absensi* sekarang agar tidak terlambat.\n\nSemangat beraktivitas dan semoga hari ini lancar! ✨`,
+    tapInWednesday: `⏰ *PENGINGAT KE POLTEK & TAP IN* ⏰\n\nSelamat pagi teman-teman! Halo @all 👋\nJangan lupa hari ini kita ada jadwal ke *Poltek*, persiapkan diri dan jangan sampai kesiangan ya!\n\nPastikan juga untuk segera melakukan *Tap In Absensi* saat tiba. Semangat kuliahnya dan hati-hati di jalan! 🚀📚✨`,
+    tapOut: `⏰ *PENGINGAT TAP OUT ABSENSI* ⏰\n\nHalo @all 🌅\nJam operasional/kegiatan hari ini telah selesai. Pastikan sudah melakukan *Tap Out Absensi* sebelum meninggalkan lokasi/mengakhiri sesi.\n\nTerima kasih atas dedikasi dan kerja kerasnya hari ini, selamat beristirahat! 🏠✨`,
+    test: `🧪 *[PESAN UJI COBA - BOT REMINDER]*\n\nHalo @all 👋\nIni adalah pesan uji coba (mode testing).\nBot WhatsApp pengingat absensi berhasil terhubung dan siap menjalankan jadwal otomatis! 🚀`
+  },
+  holidays: [
+    '2026-01-01',
+    '2026-01-28',
+    '2026-01-29',
+    '2026-03-21',
+    '2026-03-31',
+    '2026-04-01',
+    '2026-04-03',
+    '2026-05-01',
+    '2026-05-14',
+    '2026-05-31',
+    '2026-06-01',
+    '2026-06-16',
+    '2026-07-07',
+    '2026-08-17',
+    '2026-09-15',
+    '2026-12-25'
+  ]
+};
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const data = fs.readFileSync(CONFIG_PATH, 'utf8');
+      return { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+    }
+  } catch (err) {
+    logger.error({ err }, 'Gagal membaca config.json, menggunakan konfigurasi default.');
+  }
+  return { ...DEFAULT_CONFIG };
+}
+
+function saveConfig(newConfig) {
+  const current = loadConfig();
+  const merged = {
+    ...current,
+    ...newConfig,
+    schedules: { ...current.schedules, ...(newConfig.schedules || {}) },
+    templates: { ...current.templates, ...(newConfig.templates || {}) },
+  };
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2), 'utf8');
+  return merged;
+}
+
 // Flag mode CLI argument: node index.js --test
 const isTestMode = process.argv.includes('--test');
 
-// Variabel referensi socket aktif
+// Variabel referensi socket aktif dan daftar cron task
 let currentSock = null;
-let isCronInitialized = false;
+let activeCronJobs = [];
 
 // ============================================================================
-// 3. HELPER TANGGAL & LIBUR
+// 2. HELPER TANGGAL & LIBUR
 // ============================================================================
 function getTodayDateString(date = new Date()) {
-  // Menghasilkan string YYYY-MM-DD sesuai Timezone Asia/Jakarta (WIB)
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
     year: 'numeric',
@@ -77,11 +109,12 @@ function getTodayDateString(date = new Date()) {
 
 function isHoliday(date = new Date()) {
   const todayStr = getTodayDateString(date);
-  return HOLIDAY_DATES.includes(todayStr);
+  const config = loadConfig();
+  return (config.holidays || []).includes(todayStr);
 }
 
 // ============================================================================
-// 4. FUNGSI PENGIRIMAN PESAN REMINDER
+// 3. FUNGSI PENGIRIMAN PESAN REMINDER DENGAN CLEAN HIDETAG
 // ============================================================================
 async function sendReminder(type) {
   const todayStr = getTodayDateString();
@@ -91,9 +124,10 @@ async function sendReminder(type) {
     return;
   }
 
-  const targetJid = process.env.TARGET_GROUP_ID;
+  const config = loadConfig();
+  const targetJid = config.targetGroupId || process.env.TARGET_GROUP_ID;
   if (!targetJid || targetJid === '120363028123456789@g.us') {
-    logger.error('TARGET_GROUP_ID belum dikonfigurasi di file .env! Pesan tidak dapat dikirim.');
+    logger.error('TARGET_GROUP_ID belum dikonfigurasi! Buka Web Dashboard atau edit file .env.');
     return;
   }
 
@@ -102,7 +136,7 @@ async function sendReminder(type) {
     return;
   }
 
-  const messageText = MESSAGE_TEMPLATES[type];
+  const messageText = config.templates?.[type] || DEFAULT_CONFIG.templates[type];
   if (!messageText) {
     logger.error(`Template pesan tipe '${type}' tidak ditemukan.`);
     return;
@@ -148,55 +182,115 @@ async function sendReminder(type) {
 }
 
 // ============================================================================
-// 5. JADWAL CRON (Timezone: Asia/Jakarta)
+// 4. JADWAL CRON DINAMIS (Timezone: Asia/Jakarta)
 // ============================================================================
 function setupCronJobs() {
-  if (isCronInitialized) {
-    return;
-  }
-  isCronInitialized = true;
+  // Hentikan jadwal cron lama jika ada (agar update jadwal langsung aktif)
+  activeCronJobs.forEach(job => job.stop());
+  activeCronJobs = [];
 
+  const config = loadConfig();
   logger.info('Menyiapkan penjadwalan reminder otomatis (WIB / Asia/Jakarta)...');
 
-  // 1. Senin, Selasa, Kamis, Jumat (1,2,4,5) - Jam 08:00 WIB (Tap In)
-  cron.schedule('0 8 * * 1,2,4,5', () => {
-    logger.info('[TRIGGER] Jadwal Tap In (Senin/Selasa/Kamis/Jumat - 08:00 WIB) tercapai.');
+  const timeToCron = (timeStr, dayOfWeek) => {
+    const [hour, minute] = (timeStr || '08:00').split(':').map(Number);
+    return `${minute} ${hour} * * ${dayOfWeek}`;
+  };
+
+  // 1. Senin, Selasa, Kamis, Jumat - Tap In
+  const tapInCron = timeToCron(config.schedules?.regularTapIn || '08:00', '1,2,4,5');
+  const job1 = cron.schedule(tapInCron, () => {
+    logger.info(`[TRIGGER] Jadwal Tap In (Sen/Sel/Kam/Jum - ${config.schedules?.regularTapIn} WIB) tercapai.`);
     sendReminder('tapIn');
-  }, {
-    scheduled: true,
-    timezone: 'Asia/Jakarta'
-  });
+  }, { scheduled: true, timezone: 'Asia/Jakarta' });
+  activeCronJobs.push(job1);
 
-  // 2. Senin, Selasa, Kamis, Jumat (1,2,4,5) - Jam 17:30 WIB (Tap Out)
-  cron.schedule('30 17 * * 1,2,4,5', () => {
-    logger.info('[TRIGGER] Jadwal Tap Out (Senin/Selasa/Kamis/Jumat - 17:30 WIB) tercapai.');
+  // 2. Senin, Selasa, Kamis, Jumat - Tap Out
+  const tapOutCron = timeToCron(config.schedules?.regularTapOut || '17:30', '1,2,4,5');
+  const job2 = cron.schedule(tapOutCron, () => {
+    logger.info(`[TRIGGER] Jadwal Tap Out (Sen/Sel/Kam/Jum - ${config.schedules?.regularTapOut} WIB) tercapai.`);
     sendReminder('tapOut');
-  }, {
-    scheduled: true,
-    timezone: 'Asia/Jakarta'
-  });
+  }, { scheduled: true, timezone: 'Asia/Jakarta' });
+  activeCronJobs.push(job2);
 
-  // 3. Khusus Hari Rabu (3) - Jam 06:30 WIB (Tap In)
-  cron.schedule('30 6 * * 3', () => {
-    logger.info('[TRIGGER] Jadwal Khusus Tap In (Rabu - 06:30 WIB) tercapai.');
-    sendReminder('tapIn');
-  }, {
-    scheduled: true,
-    timezone: 'Asia/Jakarta'
-  });
+  // 3. Khusus Hari Rabu - Tap In (Poltek)
+  const wedTapInCron = timeToCron(config.schedules?.wednesdayTapIn || '06:00', '3');
+  const job3 = cron.schedule(wedTapInCron, () => {
+    logger.info(`[TRIGGER] Jadwal Khusus Tap In (Rabu - ${config.schedules?.wednesdayTapIn} WIB) tercapai.`);
+    sendReminder('tapInWednesday');
+  }, { scheduled: true, timezone: 'Asia/Jakarta' });
+  activeCronJobs.push(job3);
 
-  // 4. Khusus Hari Rabu (3) - Jam 16:00 WIB (Tap Out)
-  cron.schedule('0 16 * * 3', () => {
-    logger.info('[TRIGGER] Jadwal Khusus Tap Out (Rabu - 16:00 WIB) tercapai.');
+  // 4. Khusus Hari Rabu - Tap Out
+  const wedTapOutCron = timeToCron(config.schedules?.wednesdayTapOut || '16:00', '3');
+  const job4 = cron.schedule(wedTapOutCron, () => {
+    logger.info(`[TRIGGER] Jadwal Khusus Tap Out (Rabu - ${config.schedules?.wednesdayTapOut} WIB) tercapai.`);
     sendReminder('tapOut');
-  }, {
-    scheduled: true,
-    timezone: 'Asia/Jakarta'
-  });
+  }, { scheduled: true, timezone: 'Asia/Jakarta' });
+  activeCronJobs.push(job4);
 
   logger.info('Semua cron schedule aktif:');
-  logger.info('- Sen, Sel, Kam, Jum : Tap In 08:00 WIB | Tap Out 17:30 WIB');
-  logger.info('- Rabu               : Tap In 06:30 WIB | Tap Out 16:00 WIB');
+  logger.info(`- Sen, Sel, Kam, Jum : Tap In ${config.schedules?.regularTapIn} WIB | Tap Out ${config.schedules?.regularTapOut} WIB`);
+  logger.info(`- Rabu               : Tap In ${config.schedules?.wednesdayTapIn} WIB | Tap Out ${config.schedules?.wednesdayTapOut} WIB`);
+}
+
+// ============================================================================
+// 5. WEB DASHBOARD SERVER (Express.js)
+// ============================================================================
+function startWebServer() {
+  const app = express();
+  const PORT = process.env.PORT || 3000;
+
+  app.use(express.json());
+  app.use(express.static(path.join(__dirname, 'public')));
+
+  // API Status & Current Config
+  app.get('/api/status', async (req, res) => {
+    const isConnected = !!(currentSock && currentSock.user);
+    let groups = [];
+    if (isConnected) {
+      try {
+        const participating = await currentSock.groupFetchAllParticipating();
+        groups = Object.values(participating).map(g => ({ id: g.id, name: g.subject }));
+      } catch (err) {
+        logger.warn('Gagal memuat daftar grup untuk UI: ' + err.message);
+      }
+    }
+    res.json({
+      online: isConnected,
+      user: currentSock?.user?.name || currentSock?.user?.id || null,
+      config: loadConfig(),
+      groups
+    });
+  });
+
+  // API Simpan Konfigurasi
+  app.post('/api/config', (req, res) => {
+    try {
+      const saved = saveConfig(req.body);
+      setupCronJobs();
+      logger.info('Konfigurasi diperbarui via Web Dashboard & jadwal diperbarui.');
+      res.json({ success: true, config: saved });
+    } catch (err) {
+      logger.error({ err }, 'Gagal menyimpan konfigurasi dari Web UI');
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // API Tes Kirim Pesan
+  app.post('/api/test-send', async (req, res) => {
+    try {
+      await sendReminder('test');
+      res.json({ success: true, message: 'Pesan uji coba berhasil dikirim!' });
+    } catch (err) {
+      logger.error({ err }, 'Gagal kirim pesan test dari Web UI');
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`🌐 Web Dashboard aktif di http://localhost:${PORT}`);
+  });
 }
 
 // ============================================================================
@@ -284,7 +378,7 @@ async function startBot() {
           });
         }
 
-        console.log('💡 TIP: Salin "Group JID" grup kelas Anda ke TARGET_GROUP_ID di file .env');
+        console.log('💡 TIP: Buka Web Dashboard di http://localhost:3000 untuk mengatur bot.');
         console.log('=================================================================\n');
       } catch (err) {
         logger.error({ err }, 'Gagal mengambil daftar grup WhatsApp');
@@ -321,7 +415,12 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Jalankan bot
+// Jalankan Web Server jika bukan mode CLI testing
+if (!isTestMode) {
+  startWebServer();
+}
+
+// Jalankan Bot
 startBot().catch((err) => {
   logger.fatal({ err }, 'Kesalahan fatal saat startup bot');
   process.exit(1);

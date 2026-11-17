@@ -32,7 +32,7 @@ attendance-reminder-bot/
 | :--- | :--- | :--- | :--- |
 | **Senin, Selasa, Kamis, Jumat** | `08:00` | **Tap In** | Pengingat absensi masuk kerja/kelas |
 | **Senin, Selasa, Kamis, Jumat** | `17:30` | **Tap Out** | Pengingat absensi selesai jam kegiatan |
-| **Rabu** *(Khusus)* | `06:30` | **Tap In** | Pengingat absensi masuk jadwal khusus |
+| **Rabu** *(Khusus)* | `06:00` | **Tap In** | Pengingat absensi masuk jadwal khusus (Ke Poltek) |
 | **Rabu** *(Khusus)* | `16:00` | **Tap Out** | Pengingat absensi keluar jadwal khusus |
 | **Sabtu & Minggu** | - | - | *Nonaktif (Weekend)* |
 | **Tanggal Merah (Holiday)** | - | - | *Otomatis dilewati* |
@@ -67,6 +67,24 @@ Salin template konfigurasi `.env.example` menjadi `.env`:
   ```bash
   cp .env.example .env
   ```
+
+---
+
+## 🌐 Web Dashboard (Pengaturan Tanpa Edit Kodingan)
+
+Bot ini dilengkapi **Web Dashboard lokal** yang sangat ringan (hanya menambah RAM ~10 MB) untuk mengatur bot langsung dari browser HP Anda:
+
+1. Buka browser (Google Chrome) di HP Anda:
+   👉 **`http://localhost:3000`**
+2. **Fitur Dashboard:**
+   * 👥 **Pilih Target Grup**: Otomatis mendeteksi nama-nama grup WhatsApp Anda dalam bentuk dropdown.
+   * 🕒 **Atur Jam Pengingat**: Ubah jam Tap In dan Tap Out (Senin-Jumat & Rabu) via time-picker.
+   * 💬 **Ubah Template Pesan**: Edit kata-kata pengingat langsung dari form teks.
+   * 📅 **Kelola Hari Libur**: Tambah atau hapus tanggal merah hanya dengan beberapa klik.
+   * 🧪 **Tes Kirim Seketika**: Tombol untuk mengirimkan pesan uji coba langsung ke grup target.
+3. **Tips PWA / Shortcut Layar Utama:**
+   * Di browser Chrome HP, klik ikon **titik tiga** di pojok kanan atas > pilih **"Tambahkan ke Layar Utama (Add to Home screen)"**.
+   * Dashboard akan muncul seperti icon aplikasi biasa di layar utama HP Anda!
 
 ---
 

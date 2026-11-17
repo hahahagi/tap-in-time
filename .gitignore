@@ -1,8 +1,9 @@
 # Dependencies
 node_modules/
 
-# Environment Variables
+# Environment & Config
 .env
+config.json
 
 # WhatsApp Auth Session Data
 auth_info/
